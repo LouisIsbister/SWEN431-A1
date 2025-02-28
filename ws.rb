@@ -1,28 +1,24 @@
 require_relative 'stack'
 
-def parse_input(input)
-  File.readlines(input)
-end
-
 # get the passed argument
 input_file = ARGV[0]
+# puts input_file.split('-')[1]
 expected_file = input_file.gsub('input', 'expected')
-expected_output = parse_input(expected_file).map { |elem| elem.chomp }
-
 puts input_file, expected_file
 
 # generate tokens from the input
-input_content = parse_input(input_file).join
+input_content = File.readlines(input_file).join
 tokens = Parser.tokenize_input(input_content)
-tokens = Parser.parse_lambdas_and_array(tokens)
-# tokens = Parser.generate_arrays(tokens)
+tokens = Parser.parse_lambdas_and_arrays(tokens)
 
 # create a new stack, pushing & executing each token
 stack = Stack.new
 tokens.each { |elem| stack.push(elem) }
-result_stack = stack.result
 
-puts "Result stack: #{result_stack}"
+result_stack = stack.to_s
+expected_output = File.readlines(expected_file).map { |elem| elem.chomp }.to_s
+
+puts "Result:   #{result_stack}"
 puts "Expected: #{expected_output}"
-puts "Result: #{result_stack == expected_output}\n\n"
+puts "Is Equal? #{result_stack == expected_output}\n\n"
 

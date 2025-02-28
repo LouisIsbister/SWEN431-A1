@@ -41,9 +41,9 @@ class Stack
     case token
     # functions that return nil/nothing
     when /DROP/i then drop
-    when /DUP/i then dup
+    when /DUP/i then duplicate
     when /SWAP/i then swap
-    when /ROT/i then rot
+    when /ROT/i then rotate
     when /ROLLD/i then rolld
     when /ROLL/i then roll
 
@@ -64,7 +64,7 @@ class Stack
     pop; nil
   end
 
-  def dup
+  def duplicate
     raise "Stack must not be empty to DUP!" if stack_empty?
     push(peek); nil
   end
@@ -74,19 +74,16 @@ class Stack
     @stack[-1], @stack[-2] = @stack[-2], @stack[-1]; nil
   end
 
-  def rot
-    rotate_left(3); nil
+  def rotate
+    rotate_left(3)
   end
 
-  def rotate_left(num_elements_to_roll)
-    raise "Must have #{num_elements_to_roll} elements to ROT!" if size < num_elements_to_roll
+  def rotate_left(elements_to_rot)
+    raise "Must have #{elements_to_rot} elements to ROT!" if size < elements_to_rot
 
-    first = @stack[size - num_elements_to_roll]
-    (0...num_elements_to_roll).each { |i|
-      cur_idx = size - num_elements_to_roll + i
-      @stack[cur_idx] = @stack[cur_idx + 1]
-    }
-    @stack[size - 1] = first; nil
+    start_idx = size - elements_to_rot
+    @stack[start_idx, elements_to_rot] = @stack[start_idx, elements_to_rot].rotate
+    nil
   end
 
   def roll
@@ -94,7 +91,7 @@ class Stack
     elements_to_roll = pop
     raise "Tried to ROLL more items than are in the stack!" if size < elements_to_roll
 
-    rotate_left(elements_to_roll); nil
+    rotate_left(elements_to_roll)
   end
 
   def rolld
@@ -120,23 +117,25 @@ class Stack
   end
 
   # Evaluates the top item of the stack by simply popping it
-  # and then pushing it back onto the stack
-  # @return nil, ensuring it doesn't get added to the stack
+  # and then pushing it back onto the stack and returns nil
+  # to ensure it doesn't get added to the stack
   def eval
     raise "Cannot EVAL an empty stack!" if stack_empty?
     push(pop); nil
   end
 
+  # Transposes the top element of the stack, so long
+  # as it is a matrix
   def transp
     raise "Cannot TRANSP an empty stack!" if stack_empty?
     x = pop
     raise "Cannot TRANSP a non-Matrix type! #{x}" unless x.is_a?(Matrix)
-    push x.transpose; nil
+    push(x.transpose); nil
   end
 
   # Stringifies the stack for easy viewing and comparison to
   # expected output
-  def result
+  def to_s
     @stack.map do |elem|
       # if a resulting element is a string
       # literal, add the quotes around it
@@ -147,23 +146,19 @@ class Stack
         estr = estr[6..]
       end
       estr
-    end
+    end.to_s
   end
-
-  def to_s
-    @stack.to_s
-  end
-
 end
 
 class Lambda
-
+  # @param [Array] lambda_tokens
   # @param [Integer] var_count
   def initialize(lambda_tokens, var_count)
     @tokens = lambda_tokens
     @var_count = var_count
   end
 
+  # @return [Lambda]
   def recursive_clone
     Lambda.new(@tokens, @var_count)
   end
@@ -206,10 +201,12 @@ end
 class Operator
   attr_accessor :operator
 
+  # @param [String] op
   def initialize(op)
     @operator = op
   end
 
+  # @param [Stack] stack
   def apply(stack)
     @stack = stack
     case @operator
@@ -289,7 +286,6 @@ class Parser
   end
 
   # @param [String] input
-  # @type [String]
   def self.next_token(input)
     case input
     when /\A(DROP|DUP|SWAP|ROT|ROLLD|ROLL|IFELSE|SELF|EVAL|TRANSP)/ then [$1, input[$1.length..]]
@@ -319,7 +315,7 @@ class Parser
   # If the token is a left brace then generate a lambda, otherwise
   # if it is a left square-bracket the generate a vector or matrix!
   # @param [Array] tokens
-  def self.parse_lambdas_and_array(tokens)
+  def self.parse_lambdas_and_arrays(tokens)
     ret = []
     until tokens.empty?
       elem = tokens.shift
@@ -363,5 +359,4 @@ class Parser
     is_matrix = array_tokens.any? {|t| t.is_a?(Vector) }
     return is_matrix ? Matrix[*array_tokens] : Vector[*array_tokens]
   end
-
 end
