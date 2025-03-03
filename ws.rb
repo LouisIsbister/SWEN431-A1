@@ -17,8 +17,11 @@ tokens.each { |elem| stack.push(elem) }
 
 result_stack = stack.to_s
 expected_output = File.readlines(expected_file).map { |elem| elem.chomp }.to_s
+is_equal = result_stack == expected_output
 
 puts "Result:   #{result_stack}"
 puts "Expected: #{expected_output}"
-puts "Is Equal? #{result_stack == expected_output}\n\n"
+puts "Is Equal? #{is_equal}\n\n"
+
+raise "#{input} test failed!" unless is_equal
 

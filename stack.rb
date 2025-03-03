@@ -279,7 +279,7 @@ class Parser
     ret = []
     until input.empty?
       token, input = next_token(input)
-      input = input.strip
+      input.strip!
       ret << token
     end
     ret
@@ -288,22 +288,22 @@ class Parser
   # @param [String] input
   def self.next_token(input)
     case input
-    when /\A(DROP|DUP|SWAP|ROT|ROLLD|ROLL|IFELSE|SELF|EVAL|TRANSP)/ then [$1, input[$1.length..]]
+    when /\A(DROP|DUP|SWAP|ROT|ROLLD|ROLL|IFELSE|SELF|EVAL|TRANSP)/ then [$1, input[$1.to_s.length..]]
 
     # raw types
-    when /\A(-?\d+\.\d+)/ then [$1.to_f, input[$1.length..]]  # float
-    when /\A(-?\d+)/ then [$1.to_i, input[$1.length..]]   # integer
-    when /\A(true)/i then [true, input[$1.length..]]   # true
-    when /\A(false)/i then [false, input[$1.length..]]    # false
-    when /\A(".*?")/i then [$1[1..$1.length - 2], input[$1.length..]]   # strings
-    when /\A(x[0-9]+)/ then [$1, input[$1.length..]]   # variables
+    when /\A(-?\d+\.\d+)/ then [$1.to_f, input[$1.to_s.length..]]  # float
+    when /\A(-?\d+)/ then [$1.to_i, input[$1.to_s.length..]]   # integer
+    when /\A(true)/i then [true, input[$1.to_s.length..]]   # true
+    when /\A(false)/i then [false, input[$1.to_s.length..]]    # false
+    when /\A(".*?")/i then [$1[1..$1.to_s.length - 2], input[$1.to_s.length..]]   # strings
+    when /\A(x[0-9]+)/ then [$1, input[$1.to_s.length..]]   # variables
 
     # binary operators
-    when /\A(\*\*|\+|-|\*|\/|%|x)/ then [Operator.new($1), input[$1.length..]]
-    when /\A(&|\||\^|<<|>>)/ then [Operator.new($1), input[$1.length..]]
-    when /\A(==|!=|<=>|>=|<=|>|<)/ then [Operator.new($1), input[$1.length..]]
+    when /\A(\*\*|\+|-|\*|\/|%|x)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
+    when /\A(&|\||\^|<<|>>)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
+    when /\A(==|!=|<=>|>=|<=|>|<)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
     # unary operators
-    when /\A([!~])/ then [Operator.new($1), input[1..]]
+    when /\A([!~])/ then [Operator.new($1.to_s), input[1..]]
     # symbols
     when /\A([x\[\],{}'])/ then [$1, input[1..]]
 
@@ -320,7 +320,7 @@ class Parser
     until tokens.empty?
       elem = tokens.shift
       if elem == '{'
-        elem = Parser.parse_lambda tokens
+        elem = Parser.parse_lambda(tokens)
       elsif elem == '['
         elem = Parser.parse_array(tokens)
       end
