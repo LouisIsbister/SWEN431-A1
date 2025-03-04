@@ -39,22 +39,22 @@ class Stack
   #         otherwise Integer, Float, String, or Boolean value
   def execute_token(token)
     case token
-    # functions that return nil/nothing
-    when /DROP/i then drop
-    when /DUP/i then duplicate
-    when /SWAP/i then swap
-    when /ROT/i then rotate
-    when /ROLLD/i then rolld
-    when /ROLL/i then roll
+      # functions that return nil/nothing
+      when /DROP/i then drop
+      when /DUP/i then duplicate
+      when /SWAP/i then swap
+      when /ROT/i then rotate
+      when /ROLLD/i then rolld
+      when /ROLL/i then roll
+      when /TRANSP/i then transp
 
-    # if else and eval functions
-    when /IFELSE/i then ifelse
-    when /EVAL/i then eval
-    when /TRANSP/i then transp
+      # if else and eval functions
+      when /IFELSE/i then ifelse
+      when /EVAL/i then eval
 
-    when Operator then token.apply(self)
-    when Lambda then token.execute(self)
-    else token
+      when Operator then token.apply(self)
+      when Lambda then token.execute(self)
+      else token
     end
   end
 
@@ -108,7 +108,6 @@ class Stack
   # pops the top 3 elements, ensures the top is a boolean
   # and executes
   def ifelse
-    raise "Cannot IFELSE when stack size < 3" if size < 3
     cond = pop
     raise "Cannot perform IFELSE on non-boolean value: #{cond}" if !cond.is_a?(TrueClass) && !cond.is_a?(FalseClass)
 
@@ -137,15 +136,12 @@ class Stack
   # expected output
   def to_s
     @stack.map do |elem|
-      # if a resulting element is a string
-      # literal, add the quotes around it
-      estr = elem.to_s
-      if elem.is_a?(String)
-        estr = "\"#{elem}\""
-      elsif estr.start_with?('Matrix') || estr.start_with?('Vector')
-        estr = estr[6..]
+      # if a resulting element is a string literal, add the quotes around it
+      case elem
+        when String then "\"#{elem}\""
+        when Matrix, Vector then elem.to_s[6..]
+        else elem.to_s
       end
-      estr
     end.to_s
   end
 end
@@ -169,7 +165,7 @@ class Lambda
     tokens = apply_variable_values(global_stack, tokens)
     until tokens.empty?
       token = tokens.shift
-      if token == "SELF"
+      if token == 'SELF'
         global_stack.push(recursive_clone, push_inplace=true)
       else
         global_stack.push(token)
@@ -210,44 +206,36 @@ class Operator
   def apply(stack)
     @stack = stack
     case @operator
-    # binary numeric operators
-    when /\+/ then binary_operation(Proc.new { |a, b| a + b })
-    when /\*\*/ then binary_operation(Proc.new { |a, b| a ** b })
-    when /\*/ then binary_operation(
-      # checks whether it is vector multiplication
-      Proc.new do |a, b|
-        return a.inner_product(b) if a.is_a?(Vector) && b.is_a?(Vector)
-        a * b
-      end
-    )
-    when /-/ then binary_operation(Proc.new { |a, b| a - b })
-    when /\// then binary_operation(Proc.new { |a, b| a / b })
-    when /%/ then binary_operation(Proc.new { |a, b| a % b })
+      when /\*\*/ then binary_operation(Proc.new { |a, b| a ** b })
 
-    # bitshift
-    when />>/ then binary_operation(Proc.new { |a, b| a >> b })
-    when /<</ then binary_operation(Proc.new { |a, b| a << b })
+      # If a and b are vectors, perform vector multiplication
+      when /\*/ then binary_operation(Proc.new { |a, b| (a.is_a?(Vector) && b.is_a?(Vector)) ? a.inner_product(b) : a * b })
+      when /x/ then binary_operation(Proc.new { |a, b| a.cross_product(b) }) # cross product of vectors
+      when /-/ then binary_operation(Proc.new { |a, b| a - b })
+      when /\+/ then binary_operation(Proc.new { |a, b| a + b })
+      when /\// then binary_operation(Proc.new { |a, b| a / b })
+      when /%/ then binary_operation(Proc.new { |a, b| a % b })
 
-    # boolean
-    when /==/ then binary_operation(Proc.new { |a, b| a == b })
-    when /!=/ then binary_operation(Proc.new { |a, b| a != b })
-    when /<=>/ then binary_operation(Proc.new { |a, b| a <=> b })
-    when />=/ then binary_operation(Proc.new { |a, b| a >= b })
-    when /<=/ then binary_operation(Proc.new { |a, b| a <= b })
-    when />/ then binary_operation(Proc.new { |a, b| a > b })
-    when /</ then binary_operation(Proc.new { |a, b| a < b })
-    when /&/ then binary_operation(Proc.new { |a, b| a & b })
-    when /\|/ then binary_operation(Proc.new { |a, b| a | b })
-    when /\^/ then  binary_operation(Proc.new { |a, b| a ^ b })
+      # bitshift
+      when />>/ then binary_operation(Proc.new { |a, b| a >> b })
+      when /<</ then binary_operation(Proc.new { |a, b| a << b })
 
-    # unary numeric operators
-    when /!/ then unary_operation(Proc.new { |a| !a })
-    when /~/ then unary_operation(Proc.new { |a| ~a })
+      # boolean
+      when /==/ then binary_operation(Proc.new { |a, b| a == b })
+      when /!=/ then binary_operation(Proc.new { |a, b| a != b })
+      when /<=>/ then binary_operation(Proc.new { |a, b| a <=> b })
+      when />=/ then binary_operation(Proc.new { |a, b| a >= b })
+      when /<=/ then binary_operation(Proc.new { |a, b| a <= b })
+      when />/ then binary_operation(Proc.new { |a, b| a > b })
+      when /</ then binary_operation(Proc.new { |a, b| a < b })
+      when /&/ then binary_operation(Proc.new { |a, b| a & b })
+      when /\|/ then binary_operation(Proc.new { |a, b| a | b })
+      when /\^/ then  binary_operation(Proc.new { |a, b| a ^ b })
 
-    # cross product of vectors
-    when /x/ then binary_operation(Proc.new { |a, b| a.cross_product(b) })
-
-    else raise "Unknown operator : #{@operator}"
+      # unary numeric operators
+      when /!/ then unary_operation(Proc.new { |a| !a })
+      when /~/ then unary_operation(Proc.new { |a| ~a })
+      else raise "Unknown operator : #{@operator}"
     end
   end
 
@@ -288,26 +276,26 @@ class Parser
   # @param [String] input
   def self.next_token(input)
     case input
-    when /\A(DROP|DUP|SWAP|ROT|ROLLD|ROLL|IFELSE|SELF|EVAL|TRANSP)/ then [$1, input[$1.to_s.length..]]
+      when /\A(DROP|DUP|SWAP|ROT|ROLLD|ROLL|IFELSE|SELF|EVAL|TRANSP)/ then [$1, input[$1.to_s.length..]]
 
-    # raw types
-    when /\A(-?\d+\.\d+)/ then [$1.to_f, input[$1.to_s.length..]]  # float
-    when /\A(-?\d+)/ then [$1.to_i, input[$1.to_s.length..]]   # integer
-    when /\A(true)/i then [true, input[$1.to_s.length..]]   # true
-    when /\A(false)/i then [false, input[$1.to_s.length..]]    # false
-    when /\A(".*?")/i then [$1[1..$1.to_s.length - 2], input[$1.to_s.length..]]   # strings
-    when /\A(x[0-9]+)/ then [$1, input[$1.to_s.length..]]   # variables
+      # raw types
+      when /\A(-?\d+\.\d+)/ then [$1.to_f, input[$1.to_s.length..]]  # float
+      when /\A(-?\d+)/ then [$1.to_i, input[$1.to_s.length..]]   # integer
+      when /\A(true)/i then [true, input[$1.to_s.length..]]   # true
+      when /\A(false)/i then [false, input[$1.to_s.length..]]    # false
+      when /\A(".*?")/i then [$1[1..$1.to_s.length - 2], input[$1.to_s.length..]]   # strings
+      when /\A(x[0-9]+)/ then [$1, input[$1.to_s.length..]]   # variables
 
-    # binary operators
-    when /\A(\*\*|\+|-|\*|\/|%|x)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
-    when /\A(&|\||\^|<<|>>)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
-    when /\A(==|!=|<=>|>=|<=|>|<)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
-    # unary operators
-    when /\A([!~])/ then [Operator.new($1.to_s), input[1..]]
-    # symbols
-    when /\A([x\[\],{}'])/ then [$1, input[1..]]
+      # binary operators
+      when /\A(\*\*|\+|-|\*|\/|%|x)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
+      when /\A(&|\||\^|<<|>>)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
+      when /\A(==|!=|<=>|>=|<=|>|<)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
+      # unary operators
+      when /\A([!~])/ then [Operator.new($1.to_s), input[1..]]
+      # symbols
+      when /\A([x\[\],{}'])/ then [$1, input[1..]]
 
-    else raise "Invalid token at beginning of input! '#{input}'"
+      else raise "Invalid token at beginning of input! '#{input}'"
     end
   end
 
@@ -352,7 +340,7 @@ class Parser
     until tokens.at(0) == ']'
       token = tokens.shift
       next if token == ','
-      array_tokens << (token == '[' ? parse_array(tokens) : token)
+      array_tokens << (if token == '[' then parse_array(tokens) else token end)
     end
     _ = tokens.shift # remove the ']'
 
