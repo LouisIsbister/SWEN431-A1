@@ -16,7 +16,7 @@ stack = Stack.new
 tokens.each { |elem| stack.push(elem) }
 
 result_stack = stack.to_s
-expected_output = File.readlines(expected_file).map { |elem| elem.chomp }.to_s
+expected_output = File.readlines(expected_file, chomp: true).to_s
 is_equal = result_stack == expected_output
 
 puts "Result:   #{result_stack}"

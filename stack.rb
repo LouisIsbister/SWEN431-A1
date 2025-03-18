@@ -135,14 +135,16 @@ class Stack
   # Stringifies the stack for easy viewing and comparison to
   # expected output
   def to_s
-    @stack.map do |elem|
+    stack_str = @stack.map do |elem|
       # if a resulting element is a string literal, add the quotes around it
       case elem
         when String then "\"#{elem}\""
         when Matrix, Vector then elem.to_s[6..]
         else elem.to_s
       end
-    end.to_s
+    end
+
+    stack_str.to_s
   end
 end
 
@@ -175,10 +177,14 @@ class Lambda
 
   # @param [Stack] global_stack
   def apply_variable_values(global_stack, tokens)
+    # @var_count may be a nested lambda that returns an int!
+    # hence we need to execute it to receive the param count
+    var_count = global_stack.execute_token(@var_count)
+
     # create the key-value variables
     vars = {}
-    (0..@var_count - 1).each { |i|
-      var_name = "x#{@var_count - i - 1}"
+    (0..var_count - 1).each { |i|
+      var_name = "x#{var_count - i - 1}"
       vars[var_name] = global_stack.pop
     }
 
@@ -261,7 +267,7 @@ class Operator
   end
 end
 
-class Parser
+module Parser
   # @param [String] input
   def self.tokenize_input(input)
     ret = []
@@ -283,7 +289,7 @@ class Parser
       when /\A(-?\d+)/ then [$1.to_i, input[$1.to_s.length..]]   # integer
       when /\A(true)/i then [true, input[$1.to_s.length..]]   # true
       when /\A(false)/i then [false, input[$1.to_s.length..]]    # false
-      when /\A(".*?")/i then [$1[1..$1.to_s.length - 2], input[$1.to_s.length..]]   # strings
+      when /\A(".*?")/i then [$1[1..-2], input[$1.to_s.length..]]   # strings
       when /\A(x[0-9]+)/ then [$1, input[$1.to_s.length..]]   # variables
 
       # binary operators
@@ -300,51 +306,58 @@ class Parser
   end
 
   # Iterates through the parsed tokens, adding each to the ret array.
-  # If the token is a left brace then generate a lambda, otherwise
-  # if it is a left square-bracket the generate a vector or matrix!
+  # If the token is a right brace then generate a lambda from the previous tokens,
+  # otherwise if it is a right square-bracket the generate a vector or matrix!
   # @param [Array] tokens
   def self.parse_lambdas_and_arrays(tokens)
     ret = []
     until tokens.empty?
-      elem = tokens.shift
-      if elem == '{'
-        elem = Parser.parse_lambda(tokens)
-      elsif elem == '['
-        elem = Parser.parse_array(tokens)
-      end
-      ret << elem
+      token = tokens.shift
+      ret << case token
+             when ']' then Parser.parse_array ret
+             when '}' then Parser.parse_lambda ret
+             else token
+             end
     end
     ret
   end
 
-  # Parse a lambda function by popping off the top stack element which is the
-  # number of variables. The retrieve the lambda function body by taking all
-  # tokens until an '}' is found. Finally, remove the lambda tokens from
-  # the tokens array along with the trailing '}'!
+  # Parse a lambda function by retrieving all the tokens from the end of
+  # tokens (ret), to the first occurrence of a '{'. Shift tokens to remove
+  # '{', shift again to get the number of parameters for the lambda, shift
+  # a final time to remove the |. The remaining tokens make up the lambda
+  # body itself!
   # @param [Array] tokens
   def self.parse_lambda(tokens)
-    param_count = tokens.shift
+    lambda_start = tokens.rindex '{'
+    raise 'There is no { to match the }!' if lambda_start == nil
 
-    # ensure the next token is a |
-    next_t = tokens.shift
-    raise "Require |!" if !next_t.is_a?(Operator) || next_t.operator != '|'
-    
-    lambda_tokens = tokens.take_while { |token| token != '}' }
-    _ = tokens.shift(lambda_tokens.size + 1)   # +1 captures the '}'
+    # the lambda tokens takes everything from the { to the end of the list
+    lambda_tokens = tokens.slice!(lambda_start, tokens.length - lambda_start)
+    raise "Unreachable error!" unless lambda_tokens.is_a?(Array)
+
+    _ = lambda_tokens.shift  # remove the {
+    param_count = lambda_tokens.shift
+
+    bar_token = lambda_tokens.shift  # ensure the next token is a |
+    raise "Require |!" if !bar_token.is_a?(Operator) || bar_token.operator != '|'
+
     Lambda.new(lambda_tokens, param_count)
   end
 
   # @param [Array] tokens
   def self.parse_array(tokens)
-    array_tokens = []
-    until tokens.at(0) == ']'
-      token = tokens.shift
-      next if token == ','
-      array_tokens << (if token == '[' then parse_array(tokens) else token end)
-    end
-    _ = tokens.shift # remove the ']'
+    arr_start = tokens.rindex '['
+    raise 'There is no [ to match the ]!' if arr_start == nil
 
-    is_matrix = array_tokens.any? {|t| t.is_a?(Vector) }
-    return is_matrix ? Matrix[*array_tokens] : Vector[*array_tokens]
+    # the lambda tokens takes everything from the { to the end of the list
+    arr_tokens = tokens.slice!(arr_start, tokens.length - arr_start)
+    raise "Unreachable error!" unless arr_tokens.is_a?(Array)
+
+    _ = arr_tokens.shift  # remove the [
+    arr_tokens.reject!{ |elem| elem == ',' }  # remove commas
+
+    is_matrix = arr_tokens.any? {|t| t.is_a?(Vector) }
+    return is_matrix ? Matrix[*arr_tokens] : Vector[*arr_tokens]
   end
 end
