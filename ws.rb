@@ -384,25 +384,25 @@ end
 # Execution code #
 ##################
 
-
-
 # get the passed argument
 input_file = ARGV[0]
 xyz = input_file.scan(/\d{3}/).first
 output_file = "output-#{xyz}.txt"
 
-# generate tokens from the input
-input_content = File.readlines(input_file).join
-tokens = Parser.tokenize_input(input_content)
-tokens = Parser.parse_lambdas_and_arrays(tokens)
+begin
+  # generate tokens from the input
+  input_content = File.readlines(input_file).join
+  tokens = Parser.tokenize_input(input_content)
+  tokens = Parser.parse_lambdas_and_arrays(tokens)
 
-# create a new stack, pushing & executing each token
-stack = Stack.new
-tokens.each { |elem| stack.push(elem) }
+  # create a new stack, pushing & executing each token
+  stack = Stack.new
+  tokens.each { |elem| stack.push(elem) }
 
-# write the remaining stack elements to the output file
-File.open(output_file, 'w') do |file|
-  stack.elems_to_s.each do |e|
-    file.puts e
-  end
+  # write the remaining stack elements to the output file
+  File.open(output_file, 'w') { |file|
+    stack.elems_to_s.each { |e| file.puts e }
+  }
+rescue Exception  # error was thrown, simply create an empty file
+  File.open(output_file, 'w') { |file| file.puts '' }
 end
