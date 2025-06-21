@@ -13,26 +13,27 @@ class Stack
     @stack.pop
   end
 
-  def stack_empty?; @stack.empty?; end
-  def size; @stack.size; end
+  def stack_empty?
+    @stack.empty?
+  end
+  
+  def size
+    @stack.size
+  end
 
   def peek
-    raise "Stack empty" if @stack.empty?
+    raise "Stack empty" if stack_empty?
     @stack.last
   end
 
-  # takes a token and executes it so long as it isn't quoted
-  # @param [Boolean] push_inplace, allows elements to be pushed without
-  # immediate execution, important for recursive lambda's and eval
-  def push(token, push_inplace=false)
-    if push_inplace || (!stack_empty? && peek == "'")
-      _ = pop if peek == "'"  # remove the quote as now the token can be executed when eval is called
-      @stack.push token
-      return
+  # takes a token and executes immediately, unless its quoted!
+  def push(token)
+    if !stack_empty? && peek == "'"
+      @stack[-1] = token    # replace the ' with the token!
+    else 
+      token = execute_token(token)
+      @stack.push(token) unless token == nil
     end
-
-    token = execute_token(token)
-    @stack.push(token) unless token == nil
   end
 
   # Given a token determine how to handle its action
@@ -44,20 +45,20 @@ class Stack
   def execute_token(token)
     case token
       # functions that return nil/nothing
-      when /DROP/i then drop
-      when /DUP/i then duplicate
-      when /SWAP/i then swap
-      when /ROT/i then rotate
-      when /ROLLD/i then rolld
-      when /ROLL/i then roll
+      when /DROP/i   then drop
+      when /DUP/i    then duplicate
+      when /SWAP/i   then swap
+      when /ROT/i    then rotate
+      when /ROLLD/i  then rolld
+      when /ROLL/i   then roll
       when /TRANSP/i then transp
 
       # if else and eval functions
       when /IFELSE/i then ifelse
-      when /EVAL/i then eval
+      when /EVAL/i   then eval
 
-      when Operator then token.apply(self)
-      when Lambda then token.execute(self)
+      when Operator  then token.apply(self)
+      when Lambda    then token.execute(self)
       else token
     end
   end
@@ -155,23 +156,24 @@ class Lambda
   # @param [Array] lambda_tokens
   # @param [Integer] var_count
   def initialize(lambda_tokens, var_count)
-    @tokens = lambda_tokens
+    @lambda_tokens = lambda_tokens
     @var_count = var_count
   end
 
   # @return [Lambda]
   def recursive_clone
-    Lambda.new(@tokens, @var_count)
+    Lambda.new(@lambda_tokens, @var_count)
   end
 
   # @param [Stack] global_stack
   def execute(global_stack)
-    tokens = @tokens.dup
-    tokens = apply_variable_values(global_stack, tokens)
-    until tokens.empty?
-      token = tokens.shift
+    lambda_tokens = @lambda_tokens.dup
+    lambda_tokens = apply_variable_values(global_stack, lambda_tokens)
+    until lambda_tokens.empty?
+      token = lambda_tokens.shift
       if token == 'SELF'
-        global_stack.push(recursive_clone, push_inplace=true)
+        global_stack.push("'")
+        global_stack.push(recursive_clone)
       else
         global_stack.push(token)
       end
@@ -179,7 +181,7 @@ class Lambda
   end
 
   # @param [Stack] global_stack
-  def apply_variable_values(global_stack, tokens)
+  def apply_variable_values(global_stack, lambda_tokens)
     # @var_count may be a nested lambda that returns an int!
     # hence we need to execute it to receive the param count
     var_count = global_stack.execute_token(@var_count)
@@ -192,15 +194,12 @@ class Lambda
     }
 
     # swap each variable with its value
-    tokens.each_with_index do |token, idx|
-      tokens[idx] = vars[token] if /\A(x[0-9]+)/.match(token.to_s)
-    end
-    tokens
+    lambda_tokens.each_with_index { |token, idx|
+      lambda_tokens[idx] = vars[token] if /\A(x[0-9]+)/.match(token.to_s)
+    }
+    lambda_tokens
   end
 
-  def to_s
-    "Lambda: [#{@var_count}] #{@tokens}"
-  end
 end
 
 class Operator
@@ -221,32 +220,32 @@ class Operator
       when /\*\*/ then binary_operation(Proc.new { |a, b| a ** b })
 
       # If a and b are vectors, perform vector multiplication
-      when /\*/ then binary_operation(Proc.new { |a, b| (a.is_a?(Vector) && b.is_a?(Vector)) ? a.inner_product(b) : a * b })
-      when /x/ then binary_operation(Proc.new { |a, b| a.cross_product(b) }) # cross product of vectors
-      when /-/ then binary_operation(Proc.new { |a, b| a - b })
-      when /\+/ then binary_operation(Proc.new { |a, b| a + b })
-      when /\// then binary_operation(Proc.new { |a, b| a / b })
-      when /%/ then binary_operation(Proc.new { |a, b| a % b })
+      when /\*/  then binary_operation(Proc.new { |a, b| (a.is_a?(Vector) && b.is_a?(Vector)) ? a.inner_product(b) : a * b })
+      when /x/   then binary_operation(Proc.new { |a, b| a.cross_product(b) }) # cross product of vectors
+      when /-/   then binary_operation(Proc.new { |a, b| a - b })
+      when /\+/  then binary_operation(Proc.new { |a, b| a + b })
+      when /\//  then binary_operation(Proc.new { |a, b| a / b })
+      when /%/   then binary_operation(Proc.new { |a, b| a % b })
 
       # bitshift
-      when />>/ then binary_operation(Proc.new { |a, b| a >> b })
-      when /<</ then binary_operation(Proc.new { |a, b| a << b })
+      when />>/  then binary_operation(Proc.new { |a, b| a >> b })
+      when /<</  then binary_operation(Proc.new { |a, b| a << b })
 
       # boolean
-      when /==/ then binary_operation(Proc.new { |a, b| a == b })
-      when /!=/ then binary_operation(Proc.new { |a, b| a != b })
+      when /==/  then binary_operation(Proc.new { |a, b| a == b })
+      when /!=/  then binary_operation(Proc.new { |a, b| a != b })
       when /<=>/ then binary_operation(Proc.new { |a, b| a <=> b })
-      when />=/ then binary_operation(Proc.new { |a, b| a >= b })
-      when /<=/ then binary_operation(Proc.new { |a, b| a <= b })
-      when />/ then binary_operation(Proc.new { |a, b| a > b })
-      when /</ then binary_operation(Proc.new { |a, b| a < b })
-      when /&/ then binary_operation(Proc.new { |a, b| a & b })
-      when /\|/ then binary_operation(Proc.new { |a, b| a | b })
-      when /\^/ then  binary_operation(Proc.new { |a, b| a ^ b })
+      when />=/  then binary_operation(Proc.new { |a, b| a >= b })
+      when /<=/  then binary_operation(Proc.new { |a, b| a <= b })
+      when />/   then binary_operation(Proc.new { |a, b| a > b })
+      when /</   then binary_operation(Proc.new { |a, b| a < b })
+      when /&/   then binary_operation(Proc.new { |a, b| a & b })
+      when /\|/  then binary_operation(Proc.new { |a, b| a | b })
+      when /\^/  then binary_operation(Proc.new { |a, b| a ^ b })
 
       # unary numeric operators
-      when /!/ then unary_operation(Proc.new { |a| !a })
-      when /~/ then unary_operation(Proc.new { |a| ~a })
+      when /!/   then unary_operation(Proc.new { |a| !a })
+      when /~/   then unary_operation(Proc.new { |a| ~a })
       else raise "Unknown operator : #{@operator}"
     end
   end
@@ -287,7 +286,6 @@ module Parser
     until input.empty?
       token, input = next_token(input)
       ret << token
-
       input.strip! # ensure any preceding whitespace is removed
     end
     ret
@@ -296,19 +294,20 @@ module Parser
   # @param [String] input
   def self.next_token(input)
     case input
+      # stack manipulation functions
       when /\A(DROP|DUP|SWAP|ROT|ROLLD|ROLL|IFELSE|SELF|EVAL|TRANSP)/ then [$1, input[$1.to_s.length..]]
 
       # raw types
       when /\A(-?\d+\.\d+)/ then [$1.to_f, input[$1.to_s.length..]]  # float
-      when /\A(-?\d+)/ then [$1.to_i, input[$1.to_s.length..]]   # integer
-      when /\A(true)/i then [true, input[$1.to_s.length..]]   # true
-      when /\A(false)/i then [false, input[$1.to_s.length..]]    # false
-      when /\A(".*?")/i then [$1[1..-2], input[$1.to_s.length..]]   # strings
-      when /\A(x[0-9]+)/ then [$1, input[$1.to_s.length..]]   # variables
+      when /\A(-?\d+)/      then [$1.to_i, input[$1.to_s.length..]]   # integer
+      when /\A(true)/i      then [true, input[$1.to_s.length..]]   # true
+      when /\A(false)/i     then [false, input[$1.to_s.length..]]    # false
+      when /\A(".*?")/i     then [$1[1..-2], input[$1.to_s.length..]]   # strings
+      when /\A(x[0-9]+)/    then [$1, input[$1.to_s.length..]]   # variables
 
       # binary operators
       when /\A(\*\*|\+|-|\*|\/|%|x)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
-      when /\A(&|\||\^|<<|>>)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
+      when /\A(&|\||\^|<<|>>)/       then [Operator.new($1.to_s), input[$1.to_s.length..]]
       when /\A(==|!=|<=>|>=|<=|>|<)/ then [Operator.new($1.to_s), input[$1.to_s.length..]]
       # unary operators
       when /\A([!~])/ then [Operator.new($1.to_s), input[1..]]
