@@ -4,8 +4,10 @@ Submission for the first SWEN431 ("Advanced Progamming Languages") assignment. T
  2. Boolean values and comparision operators.
  3. Matrix and vector values and operators.
  4. Stack manipulation functions such as ROLL, SWAP, ROT etc.
- 5. Lambdas and recursive calls with SELF operator, variable quoting, and EVAL command.  
-For example, the following input specifies a lambda whose body contains two variables `x0`, and `x1`, and computes the factorial of the top element of the stack! (In this case 5):
+ 5. Lambdas and recursive calls with SELF operator, variable quoting, and EVAL command.   
+
+For example, the following input specifies a lambda whose body contains two variables `x0`, and `x1`, and computes the factorial of the top element of the stack! (In this case 5 and results in 120):
+
 ```ruby
 1 5
 { 2 | x0 x1 * x1 1 - DUP 0 > SELF ’DROP ROT IFELSE EVAL}
